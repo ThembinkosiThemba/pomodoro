@@ -1,14 +1,15 @@
-use crate::pomodoro::Pomodoro;
+use crate::pomodoro::{Pomodoro, PomodoroState};
+use crate::stats::Stats;
 use crate::timer::Timer;
 use crate::{clock::Clock, task::TaskList};
 use eframe::egui;
 use egui::{Align, Layout, RichText, Ui};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(PartialEq)]
 pub enum Tab {
-    Clock,
     Pomodoro,
+    Clock,
     Timer,
 }
 
@@ -19,6 +20,7 @@ pub struct ClockApp {
     current_tab: Tab,
     last_update: Instant,
     task_list: TaskList,
+    stats: Stats,
 }
 
 impl ClockApp {
@@ -27,9 +29,10 @@ impl ClockApp {
             clock: Clock::new(),
             pomodoro: Pomodoro::new(),
             timer: Timer::new(),
-            current_tab: Tab::Clock,
+            current_tab: Tab::Pomodoro,
             last_update: Instant::now(),
             task_list: TaskList::load_from_file(),
+            stats: Stats::load(),
         }
     }
 
@@ -51,7 +54,7 @@ impl ClockApp {
 
         ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
             ui.add_space(5.0);
-            ui.label(RichText::new("Rust Clock v0.1.0").small().weak());
+            ui.label(RichText::new("Pomodoro By Bane v0.1.0").small().weak());
         });
     }
 
@@ -63,6 +66,15 @@ impl ClockApp {
         self.pomodoro.update(elapsed, ctx);
         self.timer.update(elapsed, ctx);
 
+        if self.pomodoro.state == PomodoroState::Work && elapsed > Duration::from_secs(0) {
+            self.stats.add_work_time(elapsed);
+        }
+
+        if self.pomodoro.metrics.completed_pomodoros > 0 {
+            self.stats.add_pomodoro();
+            self.stats.save(); // Save stats after update
+        }
+
         // Request a repaint for the next frame to keep the UI updating
         ctx.request_repaint();
         self.task_list.save_to_file();
@@ -71,7 +83,6 @@ impl ClockApp {
 
 impl eframe::App for ClockApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Update clock and timers
         self.clock.update();
         self.update_timers(ctx);
 
@@ -79,23 +90,22 @@ impl eframe::App for ClockApp {
             self.render_tab_bar(ui);
 
             match self.current_tab {
-                Tab::Clock => self.clock.ui(ui),
                 Tab::Pomodoro => {
                     ui.horizontal(|ui| {
-                        // Left panel for Pomodoro timer (fixed width, e.g., 50% of screen)
+                        ui.add_space(40.0);
                         ui.vertical(|ui| {
-                            ui.set_width(ui.available_width() * 0.5); // 50% of the screen width
+                            ui.set_width(ui.available_width() * 0.5);
                             self.pomodoro.ui(ui);
                         });
 
-                        // Right panel for task list, settings, and metrics
                         ui.vertical(|ui| {
-                            ui.set_width(ui.available_width()); // Use remaining width
-                            ui.add_space(20.0); // Spacing between Pomodoro and right panel
-                            self.task_list.ui(ui, &mut self.pomodoro); // Task list
+                            ui.set_width(ui.available_width());
+                            ui.add_space(20.0);
+                            self.task_list.ui(ui, &mut self.pomodoro);
                         });
                     });
                 }
+                Tab::Clock => self.clock.ui(ui),
                 Tab::Timer => self.timer.ui(ui),
             }
 

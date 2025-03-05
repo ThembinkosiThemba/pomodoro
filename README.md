@@ -37,7 +37,7 @@ cargo run
 - Timer:
   - Set custom duration using the input fields
   - Use quick-set buttons for common durations
-  - Tasks are automatically backed up to ~/.rust_clock_backup/tasks.json
+  - Tasks are automatically backed up to ~/.rust_pomodoro_backup/tasks.json
 
 ### Controls
 
